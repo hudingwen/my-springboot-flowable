@@ -1,0 +1,24 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://127.0.0.1:3306/flowable-ui?useSSL=false&useUnicode=true&characterEncoding=utf8&serverTimezone=GMT%2B8&allowMultiQueries=true&nullCatalogMeansCurrent=true
+    username: root
+    password: root
+flowable:
+  #关闭定时任务JOB
+  async-executor-activate: false
+  #自动建表
+  database-schema-update: true
+  common:
+    app:
+      #目前先设置一个正确但是不一定可用的url地址
+      idm-url: http://localhost:${server.port}/flowable-idm1
+      idm-admin:
+        #需要设置一个密码，目前先设置，后期不使用
+        password: test
+        #默认user为admin，这个地方可设置可不设置
+        user: admin1
