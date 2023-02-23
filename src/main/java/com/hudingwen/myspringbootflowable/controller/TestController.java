@@ -137,7 +137,7 @@ public class TestController {
 //        map.put("day", 12);
 //        map.put("studentUser", "小明");
 //        ProcessInstance studentLeave = runtimeService.startProcessInstanceById(processid,processid, map);
-        map.put("managerUserIds", new String[]{"小明1","小明2","小明3"});
+
 
 
         ProcessInstance studentLeave = managementService.executeCommand(new StartProcessNameProcessInstanceCmd<ProcessInstance>("xxxxxx采购项目",processid,map));
@@ -224,13 +224,13 @@ public class TestController {
         if (pi == null) {
             return;
         }
-        Task task = taskService.createTaskQuery().processInstanceId(pi.getId()).singleResult();
-        //使用流程实例ID，查询正在执行的执行对象表，返回流程实例对象
-        String InstanceId = task.getProcessInstanceId();
-        List<Execution> executions = runtimeService
-                .createExecutionQuery()
-                .processInstanceId(InstanceId)
-                .list();
+//        Task task = taskService.createTaskQuery().processInstanceId(pi.getId()).singleResult();
+//        //使用流程实例ID，查询正在执行的执行对象表，返回流程实例对象
+//        String InstanceId = task.getProcessInstanceId();
+//        List<Execution> executions = runtimeService
+//                .createExecutionQuery()
+//                .processInstanceId(InstanceId)
+//                .list();
 
 
 
@@ -278,18 +278,89 @@ public class TestController {
         Task task = taskService.createTaskQuery().processInstanceId(instanceid).singleResult();
         Map<String, Object> myMap = new HashMap<>();
         myMap.put("outcome", "通过");
-        ArrayList<String> strings = new ArrayList<>();
-        strings.add("小明1");
-        strings.add("小明2");
-        strings.add("小明3");
-        myMap.put("managerUserIds", strings);
         taskService.complete(task.getId(),myMap);
-
         Task curTask = taskService.createTaskQuery().processInstanceId(instanceid).singleResult();
 
         TaskInfo taskInfo = new TaskInfo();
         BeanUtils.copyProperties(curTask,taskInfo);
         return MessageModel.Success("获取成功",taskInfo);//MessageModel
+    }
+
+    /**
+     * 会签之前提交要会签的人
+     */
+    @GetMapping("/signBefore")
+    public MessageModel signBefore(String instanceid) {
+        Task task = taskService.createTaskQuery()
+                .processInstanceId(instanceid)
+                .singleResult();
+        Map<String, Object> myMap = new HashMap<>();
+        ArrayList<String> strings = new ArrayList<>();
+        strings.add("小明1");
+        strings.add("小明2");
+        strings.add("小明3");
+        strings.add("小明4");
+        myMap.put("managerUserIds",  strings);
+        
+        taskService.complete(task.getId(),myMap);
+        List<Task> list = taskService.createTaskQuery().processInstanceId(instanceid).list();
+
+        List<TaskInfo> ls = new ArrayList<TaskInfo>();
+        for (Task item:list ) {
+            TaskInfo taskInfo = new TaskInfo();
+            BeanUtils.copyProperties(item,taskInfo);
+            ls.add(taskInfo);
+            log.info("taskid = {}, name = {}, instanceid = {}",item.getId(),item.getName(),item.getProcessInstanceId());
+        }
+        
+        return MessageModel.Success("获取成功",ls);//MessageModel
+    }
+    
+    /**
+     * 会签
+     */
+    @GetMapping("/excutesign")
+    public MessageModel excute(String instanceid,String outcome,String assignee) {
+        Object task_approved_count = runtimeService.getVariable(instanceid, "task_approved_count");
+        Object task_rejected_count = runtimeService.getVariable(instanceid, "task_rejected_count");
+        Task task = taskService.createTaskQuery()
+                .processInstanceId(instanceid)
+                .taskAssignee(assignee)
+                .singleResult();
+        Map<String, Object> myMap = new HashMap<>();
+        if("通过".equals(outcome))
+        {
+            //部门会签通过
+            if(task_approved_count==null){
+                task_approved_count = 1;
+            }else{
+                task_approved_count = Integer.parseInt(task_approved_count.toString()) + 1;
+            }
+        }else{
+            //部门会签驳回
+            if(task_rejected_count==null){
+                task_rejected_count = 1;
+            }else{
+                task_rejected_count = Integer.parseInt(task_rejected_count.toString()) + 1;
+            }
+        }
+        if(task_approved_count ==null) task_approved_count = 0;
+        if(task_rejected_count == null) task_rejected_count =0;
+        myMap.put("task_approved_count",task_approved_count);
+        myMap.put("task_rejected_count",task_rejected_count);
+        taskService.complete(task.getId(),myMap);
+
+        List<Task> list = taskService.createTaskQuery().processInstanceId(instanceid).list();
+
+        List<TaskInfo> ls = new ArrayList<TaskInfo>();
+        for (Task item:list ) {
+            TaskInfo taskInfo = new TaskInfo();
+            BeanUtils.copyProperties(item,taskInfo);
+            ls.add(taskInfo);
+            log.info("taskid = {}, name = {}, instanceid = {}",item.getId(),item.getName(),item.getProcessInstanceId());
+        }
+
+        return MessageModel.Success("获取成功",ls);//MessageModel
     }
 
     /**
@@ -369,7 +440,8 @@ public class TestController {
             ls.add(processInstanceInfo);
             log.info("name = {}, processid = {}, instanceid = {}, deploymentid = {}",item.getName(),item.getProcessDefinitionId(),item.getId(),item.getDeploymentId());
 
-            Task task = taskService.createTaskQuery().processInstanceId(processInstanceInfo.getId()).singleResult();
+            Task task =  taskService.createTaskQuery().processInstanceId(processInstanceInfo.getId()).list().get(0);
+
             log.info("taskid = {} ,name = {}",task.getId(),task.getName());
             TaskInfo taskInfo = new TaskInfo();
             BeanUtils.copyProperties(task,taskInfo);
@@ -383,7 +455,7 @@ public class TestController {
         return MessageModel.Success("获取成功",ls);//MessageModel
     }
     /**
-     * 查看所有实例(包括删除的实例)
+     * 查看历史所有实例(包括删除的实例)
      */
     @GetMapping("/instanceAll")
     public MessageModel instanceAll(String processid){
